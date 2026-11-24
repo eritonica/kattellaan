@@ -1,3 +1,5 @@
 .*
 gource.mp4
 !/.gitignore
+uploads/
+php/ip-addresses.txt

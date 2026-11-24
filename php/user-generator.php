@@ -1,6 +1,7 @@
 <?php
 
-require_once("dbwrapper/db.php");
+require_once(__DIR__ . "/config.php");
+require_once(__DIR__ . "/dbwrapper/db.php");
 require_once("account.php");
 require_once("profile.php");
 require_once("position.php");
@@ -16,9 +17,9 @@ $male_names_count = count($male_names);
 $female_names_count = count($female_names);
 $lastnames_count = count($lastnames);
 
-$passwd = explode(":", base64_decode(file_get_contents("/home/temek/kattellaan/.passwd")));
+$passwd = kattellaan_db_credentials();
 $database = new db("mysqli");
-if($database->connect("127.0.0.1", $passwd[0], $passwd[1], "kattellaan") == true) {
+if($database->connect(KATTELLAAN_DB_HOST, $passwd[0], $passwd[1], KATTELLAAN_DB_NAME) == true) {
 	for($i = 390; $i < $usernames_count; $i++) {
 		$account = array();
 		$username = $usernames[$i];

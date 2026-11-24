@@ -116,7 +116,7 @@ class distance {
 			throw new Exception("Identifier already set.");
 			return false;
 		}
-		if(empty($this->distance)) {
+		if($this->distance === null || $this->distance === "") {
 			throw new Exception("Distance is not set.");
 			return false;
 		}
@@ -145,154 +145,24 @@ class distance {
 		return false;
 	}
 	
+	// Returns the next pair of positions that has no calculated distance yet,
+	// as array("start" => position row, "end" => position row), or false.
 	function get_uncalculated() {
-		$last_distance_statement = $this->database->prepare("SELECT * FROM `distance` ORDER BY `id` DESC LIMIT 0, 1;");
-		$last_distance_result = $last_distance_statement->execute();
-		if($last_distance_result->success() == true && $last_distance_result->rows() == 1) {
-			$first_position_statement = $this->database->prepare("SELECT * FROM `position` LIMIT 0, 1;");
-			$first_position_result = $first_position_statement->execute();
-			if($first_position_result->rows() < 1) {
-				return false;
-			}
-
-			$last_position_statement = $this->database->prepare("SELECT * FROM `position` ORDER BY `id` DESC LIMIT 0, 1;");
-			$last_position_result = $last_position_statement->execute();
-			if($last_position_result->rows() < 1) {
-				return false;
-			}
-
-			$last_distance = $last_distance_result->fetch_array(RASSOC);
-			$first_position = $first_position_result->fetch_array(RASSOC);
-			$last_position = $last_position_result->fetch_array(RASSOC);
-			if($first_position['id'] == $last_position['id']) {
-				return false;
-			}
-		
-			if($last_distance['end'] == $last_position['id']) {
-				$next_end = $first_position['id'];
-				if($last_distance['start'] == $last_position['id']) {
-					return false;
-				} else {
-					$next_start_found = false;
-					$next_start = $last_distance['start'] + 1;
-					while($next_start_found == false) {
-						$next_start_statement = $this->database->prepare("SELECT * FROM `position` WHERE `id` = ?;");
-						$next_start_statement->bind("i", $next_start);
-						$next_start_result = $next_start_statement->execute();
-						if($next_start_result->success() == true && $next_start_result->rows() == 1) {
-							$next_start_data = $next_start_result->fetch_array(RASSOC);
-							$next_start = $next_start_data['id'];
-							$exists_statement = $this->database->prepare("SELECT * FROM `distance` WHERE (`start` = ? AND `end` = ?) OR (`start` = ? AND `end` = ?);");
-							$exists_statement->bind("i", $next_start);
-							$exists_statement->bind("i", $next_end);
-							$exists_statement->bind("i", $next_end);
-							$exists_statement->bind("i", $next_start);
-							$exists_result = $exists_statement->execute();
-							if($exists_result->success() == true && $exists_result->rows() == 1) {
-								$next_end_found = false;
-								$next_end = $next_end + 1;
-								while($next_end_found == false) {
-									$next_end_statement = $this->database->prepare("SELECT * FROM `position` WHERE `id` = ?;");
-									$next_end_statement->bind("i", $next_end);
-									$next_end_result = $next_end_statement->execute();
-									if($next_end_result->success() == true && $next_end_result->rows() == 1) {
-										$next_end_data = $next_end_result->fetch_array(RASSOC);
-										$next_end = $next_end_data['id'];
-										$exists_statement = $this->database->prepare("SELECT * FROM `distance` WHERE (`start` = ? AND `end` = ?) OR (`start` = ? AND `end` = ?);");
-										$exists_statement->bind("i", $next_start);
-										$exists_statement->bind("i", $next_end);
-										$exists_statement->bind("i", $next_end);
-										$exists_statement->bind("i", $next_start);
-										$exists_result = $exists_statement->execute();
-										if($exists_result->success() == true && $exists_result->rows() == 1) {
-											$next_end += 1;
-										} else {
-											if($next_start != $next_end) {
-												$next_end_found = true;	
-											} else {
-												$next_end += 1;
-											}
-										}
-									} else {
-										$next_end += 1;
-									}
-									if($next_end == $last_position['id']) {
-										return false;
-									}
-								}	
-							} else {
-								$next_start_found = true;	
-							}
-						} else {
-							$next_start += 1;
-						}
-					}
-				}
-			} else {
-				$next_start = $last_distance['start'];		
-				$next_end_found = false;
-				$next_end = $last_distance['end'] + 1;
-				while($next_end_found == false) {
-					$next_end_statement = $this->database->prepare("SELECT * FROM `position` WHERE `id` = ?;");
-					$next_end_statement->bind("i", $next_end);
-					$next_end_result = $next_end_statement->execute();
-					if($next_end_result->success() == true && $next_end_result->rows() == 1) {
-						$next_end_data = $next_end_result->fetch_array(RASSOC);
-						$next_end = $next_end_data['id'];
-						$exists_statement = $this->database->prepare("SELECT * FROM `distance` WHERE (`start` = ? AND `end` = ?) OR (`start` = ? AND `end` = ?);");
-						$exists_statement->bind("i", $next_start);
-						$exists_statement->bind("i", $next_end);
-						$exists_statement->bind("i", $next_end);
-						$exists_statement->bind("i", $next_start);
-						$exists_result = $exists_statement->execute();
-						if($exists_result->success() == true && $exists_result->rows() == 1) {
-							$next_end += 1;
-						} else {
-							$next_end_found = true;	
-						}
-					} else {
-						$next_end += 1;
-					}
-					if($next_end == $last_position['id']) {
-						return false;
-					}
-				}
-			}
-
-			
-			printf("Next start: %s, Next end: %s\r\n", $next_start, $next_end);
-			$start_select = $this->database->prepare("SELECT * FROM `position` WHERE `id` = ?");
-			$start_select->bind("i", $next_start);
-			$start_result = $start_select->execute();
-			if($start_result->success() == true && $start_result->rows() == 1) {
-				$start = $start_result->fetch_array(RASSOC);
-				$start['identifier'] = $start['id'];
-			}
-			$end_select = $this->database->prepare("SELECT * FROM `position` WHERE `id` = ?");
-			$end_select->bind("i", $next_end);
-			$end_result = $end_select->execute();
-			if($end_result->success() == true && $end_result->rows() == 1) {
-				$end = $end_result->fetch_array(RASSOC);
-				$end['identifier'] = $end['id'];
-			}
+		$statement = $this->database->prepare(
+			"SELECT a.id AS start_id, a.latitude AS start_latitude, a.longitude AS start_longitude, " .
+			"b.id AS end_id, b.latitude AS end_latitude, b.longitude AS end_longitude " .
+			"FROM `position` a INNER JOIN `position` b ON a.id < b.id " .
+			"WHERE NOT EXISTS (SELECT 1 FROM `distance` d WHERE " .
+			"(d.start = a.id AND d.end = b.id) OR (d.start = b.id AND d.end = a.id)) " .
+			"ORDER BY a.id, b.id LIMIT 0, 1;");
+		$result = $statement->execute();
+		if($result->success() == true && $result->rows() == 1) {
+			$row = $result->fetch_array(RASSOC);
+			$start = array("id" => $row["start_id"], "identifier" => $row["start_id"],
+				"latitude" => $row["start_latitude"], "longitude" => $row["start_longitude"]);
+			$end = array("id" => $row["end_id"], "identifier" => $row["end_id"],
+				"latitude" => $row["end_latitude"], "longitude" => $row["end_longitude"]);
 			return array("start" => $start, "end" => $end);
-		} else {
-			$start = 1;
-			$end_statement = $this->database->prepare("SELECT * FROM `position` WHERE `id` = ?");
-			$end_statement->bind("i", $start + 1);
-			$end_result = $end_statement->execute();
-			if($end_result->success() == true && $end_result->rows() >= 1) {
-				$end = $end_result->fetch_array(RASSOC);
-				$start_statement = $this->database->prepare("SELECT * FROM `position` WHERE `id` = ?");
-				$start_statement->bind("i", $start);
-				$start_result = $start_statement->execute();
-				if($start_result->success() == true && $start_result->rows() >= 1) {
-					$start = $start_result->fetch_array(RASSOC);
-					$start['identifier'] = $start['id'];
-					$end['identifier'] = $end['id'];
-					return array("start" => $start, "end" => $end);
-				}
-			}
 		}
 		return false;
 	}

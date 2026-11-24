@@ -5,7 +5,8 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 ini_set('max_execution_time', 120);
 
-require_once("dbwrapper/db.php");
+require_once(__DIR__ . "/config.php");
+require_once(__DIR__ . "/dbwrapper/db.php");
 require_once("position.php");
 require_once("distance.php");
 
@@ -13,16 +14,16 @@ function rad($x) {
 	return $x * pi() / 180;
 }
 
-$passwd = explode(":", base64_decode(file_get_contents("/home/temek/kattellaan/.passwd")));
+$passwd = kattellaan_db_credentials();
 $database = new db("mysqli");
-if($database->connect("127.0.0.1", $passwd[0], $passwd[1], "kattellaan") == true) {
+if($database->connect(KATTELLAAN_DB_HOST, $passwd[0], $passwd[1], KATTELLAAN_DB_NAME) == true) {
 	$distance = new distance($database);
 	$distance_work = $distance->get_uncalculated();
 	if($distance_work != false) {	
 		$completed = false;
 		$r = 6378137;
 		$dLat = rad($distance_work['end']['latitude'] - $distance_work['start']['latitude']);
-		$dLong = rad($distance_work['end']['longitude'] - $distance_work['end']['longitude']);
+		$dLong = rad($distance_work['end']['longitude'] - $distance_work['start']['longitude']);
 		$a = sin($dLat / 2) * sin($dLat / 2) + cos(rad($distance_work['start']['latitude'])) * cos(rad($distance_work['end']['latitude'])) * sin($dLong / 2) * sin($dLong / 2);
 		$c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 		$d = $r * $c;

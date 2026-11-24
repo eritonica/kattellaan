@@ -87,7 +87,8 @@ class position {
 			$statement = $this->database->prepare("SELECT * FROM `position` WHERE `id` = ?;");
 			$statement->bind("i", $this->identifier);
 		} else if(!empty($this->latitude) && !empty($this->longitude)) {
-			$statement = $this->database->prepare("SELECT * FROM `position` WHERE `latitude` = ? AND `longitude` = ?;");
+			// Several users can share coordinates; use the first matching position.
+			$statement = $this->database->prepare("SELECT * FROM `position` WHERE `latitude` = ? AND `longitude` = ? ORDER BY `id` LIMIT 0, 1;");
 			$statement->bind("d", $this->latitude);
 			$statement->bind("d", $this->longitude);
 		} else {
@@ -95,7 +96,7 @@ class position {
 		}
 		$result = $statement->execute();
 		if($result->success() == true) {
-			if($result->rows() == 1) {
+			if($result->rows() >= 1) {
 				$data = $result->fetch_object();
 				if(empty($data)) throw new Exception("Failed to fetch object!");
 				$this->identifier = $data->id;

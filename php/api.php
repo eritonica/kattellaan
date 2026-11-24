@@ -7,7 +7,8 @@ ini_set('display_startup_errors', 1);
 ignore_user_abort(false);
 ini_set('max_execution_time', 120);
 
-require_once("dbwrapper/db.php");
+require_once(__DIR__ . "/config.php");
+require_once(__DIR__ . "/dbwrapper/db.php");
 require_once("account.php");
 require_once("session.php");
 require_once("invite.php");
@@ -17,9 +18,9 @@ require_once("position.php");
 require_once("distance.php");
 require_once("messages.php");
 
-$passwd = explode(":", base64_decode(file_get_contents("/home/temek/kattellaan/.passwd")));
+$passwd = kattellaan_db_credentials();
 $database = new db("mysqli");
-if($database->connect("127.0.0.1", $passwd[0], $passwd[1], "kattellaan") == true) {
+if($database->connect(KATTELLAAN_DB_HOST, $passwd[0], $passwd[1], KATTELLAAN_DB_NAME) == true) {
 
 	// Exit if no data was given to the api
 	if(empty($_GET) && empty($_POST)) {
@@ -83,7 +84,7 @@ if($database->connect("127.0.0.1", $passwd[0], $passwd[1], "kattellaan") == true
 								"Content-Type: text/plain; charset=UTF-8\r\n" .
 								"Reply-To: support@kattellaan.com\r\n" .
 								"X-Mailer: PHP/" . phpversion();
-							mail($to, $subject, $message, $headers);
+							kattellaan_mail($to, $subject, $message, $headers);
 				
 							/// return information to the browser
 							printf('{ "success": true, "uid": "%s" }', $account->get_identifier());
@@ -183,7 +184,7 @@ if($database->connect("127.0.0.1", $passwd[0], $passwd[1], "kattellaan") == true
 					"Content-Type: text/plain; charset=UTF-8\r\n" .
 					"Reply-To: support@kattellaan.com\r\n" .
 					"X-Mailer: PHP/" . phpversion();
-				mail($to, $subject, $message, $headers);
+				kattellaan_mail($to, $subject, $message, $headers);
 				printf('{ "success": true }');
 			} else {
 				printf('{ "success": false, "error": "Käyttäjätunnuksen sähköpostiosoite ei vastaa antamaasi sähköpostiosoitetta." }');
@@ -339,7 +340,7 @@ if($database->connect("127.0.0.1", $passwd[0], $passwd[1], "kattellaan") == true
 	} else if(!empty($_POST['call']) && $_POST['call'] == "upload") {
 		$uploaded_files = array();
 		$failed_files = array();
-		$upload_directory = "/home/temek/kattellaan-live/uploads/";
+		$upload_directory = KATTELLAAN_UPLOAD_DIR;
 		if(!empty($_FILES)) {
 			for($i = 0; $i < count($_FILES['file']['name']); $i++) {
 				if(move_uploaded_file($_FILES['file']['tmp_name'][$i], $upload_directory . $_FILES['file']['name'][$i])) {	
@@ -430,7 +431,10 @@ if($database->connect("127.0.0.1", $passwd[0], $passwd[1], "kattellaan") == true
 					$distance = new distance($database);
 					$distance->set_start($my_position->get_identifier());
 					$distance->set_end($his_position->get_identifier());
-					if($distance->select() == true) {
+					if($my_position->get_identifier() != null && $my_position->get_identifier() == $his_position->get_identifier()) {
+						// Same coordinates.
+						printf('{ "success": true, "distance": "0" }');
+					} else if($distance->select() == true) {
 						printf('{ "success": true, "distance": "%s" }', $distance->get_distance());
 					} else {
 						printf('{ "success": true, "distance": "Unknown" }');
@@ -657,7 +661,8 @@ if($database->connect("127.0.0.1", $passwd[0], $passwd[1], "kattellaan") == true
 				}
 			}
 			$jsonthis = array("success" => true, "discussion" => $results);
-			$json = json_encode($jsonthis);
+			// Don't let one message with invalid UTF-8 blank out the whole discussion.
+			$json = json_encode($jsonthis, JSON_INVALID_UTF8_SUBSTITUTE);
 			printf("%s", $json);
 		} else {
 			printf('{ "success": false, "error": "Session does not exist." }');
@@ -817,10 +822,11 @@ if($database->connect("127.0.0.1", $passwd[0], $passwd[1], "kattellaan") == true
 				$data = json_decode($call, true);
 				$data['address'] = $_POST['street-address'] . " " . $_POST['town-address'] . " " . $_POST['country-address'];
 				$data['address'] = str_replace(" ", "+", $data['address']);
-				$data['looking_for'] = implode(",", $data['looking_for']);
-				$data['kids'] = implode(",", $data['kids']);
-				$data['language_skills'] = implode(",", $data['language_skills']);
-				$data['pets'] = implode(",", $data['pets']);
+				// Multi-selects are omitted from the request when nothing is selected.
+				$data['looking_for'] = implode(",", (array)($data['looking_for'] ?? array()));
+				$data['kids'] = implode(",", (array)($data['kids'] ?? array()));
+				$data['language_skills'] = implode(",", (array)($data['language_skills'] ?? array()));
+				$data['pets'] = implode(",", (array)($data['pets'] ?? array()));
 				$data['picture'] = $profile->get_picture();
 				$profile->set($data);
 				if($profile->update() == true) {

@@ -39,7 +39,7 @@ class invite {
 			"Content-Type: text/html; charset=UTF-8\r\n" .
 			"Reply-To: support@kattellaan.com\r\n" .
 			"X-mailer: PHP/ " . phpversion();
-		return mail($to, $subject, $message, $headers);
+		return kattellaan_mail($to, $subject, $message, $headers);
 	}
 
 	public function insert($address, $requester) {
